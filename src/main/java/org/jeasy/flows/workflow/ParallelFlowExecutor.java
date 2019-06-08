@@ -30,10 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,11 +47,26 @@ public class ParallelFlowExecutor {
      */
     private ExecutorService workExecutor;
 
-    ParallelFlowExecutor() {
-        this.workExecutor = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());;
+    private Integer timeout;
+
+    public ParallelFlowExecutor() {
+        this.workExecutor = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());
+        this.timeout = 2000;
     }
 
-    List<WorkReport> executeInParallel(List<Work> works) {
+    public ParallelFlowExecutor(Integer timeout) {
+        this.workExecutor = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());
+        this.timeout = timeout;
+    }
+
+    public ParallelFlowExecutor(ExecutorService workExecutor, Integer timeout) {
+        this.workExecutor = workExecutor;
+        this.timeout = timeout;
+    }
+
+    List<WorkReport> executeInParallel(List<Work> works) throws InterruptedException {
+        CountDownLatch countDownLatch = new CountDownLatch(works.size());
+
         // re-init in case it has been shut down in a previous run (See question 3)
         if(workExecutor.isShutdown()) {
             workExecutor = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());
@@ -64,6 +76,8 @@ public class ParallelFlowExecutor {
         Map<Work, Future<WorkReport>> reportFutures = new HashMap<>();
         for (Work work : works) {
             Future<WorkReport> reportFuture = workExecutor.submit(work);
+            // Dealing with timeouts
+            countDownLatch.await(timeout, TimeUnit.MILLISECONDS);
             reportFutures.put(work, reportFuture);
         }
 
